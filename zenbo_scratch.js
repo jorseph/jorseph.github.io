@@ -5,19 +5,137 @@
     };
 	
     port = ":8080";
+
+    var getValueIndex  = function(ip) {
+
+        var returnValueIndex = -1;
+
+        for(var r = 0; r < flagArray.data.length; r++){
+
+             if ( ip == flagArray.data[r].device) {
+                  returnValueIndex = r;
+             }
+        }
+
+        if ( returnValueIndex === -1 ) {
+               console.log('returnValueIndex  === -1');
+        }      
+
+       
+        return returnValueIndex;
+
+    };
+
+    function sleep(milliseconds) 
+    { 
+       var start = new Date().getTime(); 
+       while(1)
+       if ((new Date().getTime() - start) > milliseconds)
+          break;
+    }
+
+    ext._stop = function () {   
+        console.log('stop...');
+
+        for(var ipIndex = 0; ipIndex < flagArray.data.length; ipIndex++) {
+
+            var ipLoop = flagArray.data[ipIndex].device;
+            console.log(ipLoop);							
+	    console.log("stopAll");
+	    $.ajax({
+ 	        url: 'http://' + ipLoop + port + '/?extension=advance' + '&name=stopAll',
+	        dataType: 'text',
+	        crossDomain: true,
+	        success: function (data) {
+	        console.log("success handler");
+
+	        },
+  	        error: function (jqXHR, textStatus, errorThrown) {
+	        console.log("error handler");
+                }
+   	    });
+
+            sleep(100);
+			
+        }
+ 
+    };
 	
     ext._shutdown = function () {
         console.log('Shutting down...');
+	ext._stop();
 
     };
 
     ext._getStatus = function () {
-         return {status: 2, msg: 'Ready'};
+        return {status: 2, msg: 'Ready'};
     };
 
-    ext.Setting_targetIP = function (ip) {
+    ext.Setting_targetIP = function (ip, callback) {
         console.log("Setting_targetIP");
-        return ip;
+        console.log("ip: "+ ip );
+
+        var setupFlag_init = true;
+        var flagIndex_init = 0; 
+
+        for(var g = 0; g < flagArray.data.length; g++) {
+
+              console.log("flagArray.data[g].device: "+  flagArray.data[g].device ); 
+             if ( ip == flagArray.data[g].device) {
+               setupFlag_init = false;
+               flagIndex_init = g; 
+               console.log("false" + "flagIndex_init: "+ flagIndex_init);
+             }    
+        }     
+
+        if ( setupFlag_init == true) {
+     
+               flagArray.data.push( { device: ip, correctedSentence: "", sentence_1_flag: false, sentence_2_flag: false, sentence_3_flag: false,
+               sentence_4_flag: false, sentence_5_flag: false, number_flag: false, touch_head_flag: false, get_sentences_flag: true, recursionFlag: true } );
+               console.log("add new device IP and its flags");
+               flagIndex_init = flagArray.data.length -1 ;
+               console.log("true " + "flagIndex_init: "+ flagIndex_init);
+
+        }
+
+        $.ajax({
+            url: 'http://' + ip + port + '/?extension=advance' + '&name=Add_and_update_sentence' + '&p1=' + 'IP' + '&p2=' + 'switch',
+            dataType: 'text',
+            crossDomain: true,
+            success: function (data) {
+             console.log("success handler");		 
+	     console.log("proceed callback 0 " + flagArray.data[flagIndex_init].recursionFlag );
+
+	     if  ( flagArray.data[flagIndex_init].recursionFlag === true) {
+		   flagArray.data[flagIndex_init].recursionFlag = false;
+
+		   console.log("proceed callback 1 " + flagArray.data[flagIndex_init].recursionFlag );
+
+		   $.ajax({
+		       url: 'http://' + ip + port + '/?extension=advance' + '&name=Add_and_update_sentence' + '&p1=' + 'test' + '&p2=' + 'zenbo',
+		       dataType: 'text',
+		       crossDomain: true,
+		       success: function (data) {
+		       console.log("Add_and_update_sentence test zenbo success handler");
+		       getSentencesRecursion(ip, flagIndex_init);
+
+		       },
+		       error: function (jqXHR, textStatus, errorThrown) {
+		       console.log("error handler");
+		       flagArray.data[flagIndex_init].recursionFlag = true;
+		       }
+		   });
+
+	      }
+              callback(); 
+
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+                console.log("error handler");
+                callback();
+            }
+        });
+        
     };
 
     var getSentencesRecursion = function(ip, flagIndex) {
@@ -37,15 +155,23 @@
                                 
 				switch(data.split(",")[0]) {
 
-                    case 'number':
+    		                        case 'touchHead':
+
+                                        console.log('摸到頭了');
+                                        console.log( ip + " "  + flagIndex + " " + "touch_head_flag true");
+                                        flagArray.data[flagIndex].touch_head_flag = true;
+
+                                        break; 
+
+                                        case 'number':
                                  
-                        console.log('辨識到number');
-                        console.log( ip + " "  + flagIndex + " " + "number_flag true");
-                        flagArray.data[flagIndex].number_flag = true;
-                        flagArray.data[flagIndex].correctedSentence = data.split(",")[1];
-                        console.log('correctedSentence:' + flagArray.data[flagIndex].correctedSentence);
+                                        console.log('辨識到number');
+                                        console.log( ip + " "  + flagIndex + " " + "number_flag true");
+                                        flagArray.data[flagIndex].number_flag = true;
+                                        flagArray.data[flagIndex].correctedSentence = data.split(",")[1];
+                                        console.log('correctedSentence:' + flagArray.data[flagIndex].correctedSentence);
                                               
-                        break; 
+                                        break; 
 
 					case '語句一':
 						
@@ -91,21 +217,20 @@
 					   
 				}  
 
-                flagArray.data[flagIndex].get_sentences_flag = true;
-                getSentencesRecursion(ip, flagIndex);  				 
+                                        flagArray.data[flagIndex].get_sentences_flag = true;
+                                        getSentencesRecursion(ip, flagIndex);  				 
 				
 				},
 				error: function (jqXHR, textStatus, errorThrown) {
 					console.log("error handler");
 			 
-			    flagArray.data[flagIndex].get_sentences_flag = true;
-                getSentencesRecursion(ip, flagIndex);	 
+			                flagArray.data[flagIndex].get_sentences_flag = true;
+                                        getSentencesRecursion(ip, flagIndex);	 
 					
 				}
 			});
 				
             }    
-	
 	
     };
 	
@@ -167,7 +292,7 @@
         });
     };
 
-    ext.Remote_control_body = function (ip, p1, callback){
+    ext.Remote_control_body = function (ip, p1){
         console.log("Remote_control_body");
         console.log(ip);
         console.log(p1);
@@ -186,37 +311,34 @@
     };
 
     ext.Stop_moving = function (ip,callback){
-
         console.log("Stop_moving");
+	console.log("Remote_control_body-Stop");
         console.log(ip);
-        $.ajax({
-            url: 'http://' + ip + port + '/?extension=advance' + '&name=Stop_moving',
+       	$.ajax({
+            url: 'http://' + ip + port + '/?extension=advance' + '&name=Remote_control_body' + '&p1=' + '停止',
             dataType: 'text',
             crossDomain: true,
             success: function (data) {
-                console.log("success handler");
-
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
+            console.log("success handler");
+					
+            console.log(ip);
+            $.ajax({
+                url: 'http://' + ip + port + '/?extension=advance' + '&name=Stop_moving',
+                dataType: 'text',
+                crossDomain: true,
+                success: function (data) {
+                console.log("success handler");					        		
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
                 console.log("error handler");
-            }
-        });
-
-        console.log("Cancel_actionset");
-        console.log(ip);
-        $.ajax({
-            url: 'http://' + ip + port + '/?extension=advance' + '&name=Cancel_actionset',
-            dataType: 'text',
-            crossDomain: true,
-            success: function (data) {
-                console.log("success handler");
-
-            },
+                }
+            });
+					
+	    },
             error: function (jqXHR, textStatus, errorThrown) {
-                console.log("error handler");
+            console.log("error handler");
             }
-        });
-       
+        });   		 
     };
 
     ext.Action = function (ip, p1,callback){
@@ -291,7 +413,7 @@
         });
     };
 
-    ext.Cancel_actionset = function (ip,callback){
+    ext.Cancel_actionset = function (ip){
         console.log("Cancel_actionset");
         console.log(ip);
         $.ajax({
@@ -329,10 +451,10 @@
 
     ext.Add_and_update_sentence = function (ip, p1, p2) {
         
-         var setupFlag_init_2 = true;
-         var flagIndex_init_2 = 0;
+        var setupFlag_init_2 = true;
+        var flagIndex_init_2 = 0;
 
-         for(var h = 0; h < flagArray.data.length; h++) {
+        for(var h = 0; h < flagArray.data.length; h++) {
 
               console.log("flagArray.data[h].device: "+  flagArray.data[h].device ); 
              if ( ip == flagArray.data[h].device) {
@@ -340,9 +462,9 @@
                flagIndex_init_2 = h;
                console.log("false" + "flagIndex_init_2: "+ flagIndex_init_2);
              }
-         }         
+        }         
 
-         if ( setupFlag_init_2 == true) {
+        if ( setupFlag_init_2 == true) {
               
                flagArray.data.push( { device: ip, correctedSentence: "", sentence_1_flag: false, sentence_2_flag: false, sentence_3_flag: false, 
                sentence_4_flag: false, sentence_5_flag: false, number_flag: false, touch_head_flag: false, get_sentences_flag: true, recursionFlag: true } );
@@ -350,31 +472,8 @@
                flagIndex_init_2 = flagArray.data.length -1 ;
                console.log("true " + "flagIndex_init_2: "+ flagIndex_init_2);
 
-         }
+        }
    
-		
-	if  ( flagArray.data[flagIndex_init_2].recursionFlag === true) {
-              flagArray.data[flagIndex_init_2].recursionFlag = false;
-
-        $.ajax({
-            url: 'http://' + ip + port + '/?extension=advance' + '&name=Add_and_update_sentence' + '&p1=' + 'test' + '&p2=' + 'zenbo',
-            dataType: 'text',
-            crossDomain: true,
-            success: function (data) {
-           
-             console.log("success handler");
-             getSentencesRecursion(ip, flagIndex_init_2);
- 
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-                console.log("error handler");
-                flagArray.data[flagIndex_init_2].recursionFlag = true; 
-            }
-        }); 
-
-        } 
-
-         
         console.log("Add_and_update_sentence");
         console.log(ip);
         console.log(p1);
@@ -384,7 +483,29 @@
             dataType: 'text',
             crossDomain: true,
             success: function (data) {
-            console.log("success handler");			
+            console.log("success handler");
+
+               if  ( flagArray.data[flagIndex_init_2].recursionFlag === true) {
+                     flagArray.data[flagIndex_init_2].recursionFlag = false;
+
+                     $.ajax({
+                         url: 'http://' + ip + port + '/?extension=advance' + '&name=Add_and_update_sentence' + '&p1=' + 'test' + '&p2=' + 'zenbo',
+                         dataType: 'text',
+                         crossDomain: true,
+                         success: function (data) {
+           
+                         console.log("success handler");
+                         getSentencesRecursion(ip, flagIndex_init_2);
+ 
+                         },
+                         error: function (jqXHR, textStatus, errorThrown) {
+                         console.log("error handler");
+                         flagArray.data[flagIndex_init_2].recursionFlag = true; 
+                         }
+                     }); 
+
+               } 
+
             },
             error: function (jqXHR, textStatus, errorThrown) {
                 console.log("error handler");
@@ -486,126 +607,122 @@
 
     ext.when_listen_and_run = function(ip, p1) {
        
-    var checkFlag = false;
-    var valueIndex = 0;
+    	var checkFlag = false;
+   	var valueIndex = 0;
 
-    for(var i = 0; i < flagArray.data.length; i++){
+   	for(var i = 0; i < flagArray.data.length; i++){
 
              if ( ip == flagArray.data[i].device) {
                   checkFlag = true;
                   valueIndex = i;
              }
-    }
+   	}
 
-    if ( checkFlag === false )
-    return false;
+  	if ( checkFlag === false )
+        return false;
 
-    switch(p1) {
+        switch(p1) {
 
-    case '語句一':
+            case '語句一':
         
-       if (flagArray.data[valueIndex].sentence_1_flag === true) {
-           flagArray.data[valueIndex].sentence_1_flag = false;
-		   console.log('true 語句一'); 
-           return true;
-       }
+            if (flagArray.data[valueIndex].sentence_1_flag === true) {
+                flagArray.data[valueIndex].sentence_1_flag = false;
+		console.log('true 語句一'); 
+                return true;
+            }
 
-        break;
+            break;
 
-    case '語句二':
+            case '語句二':
         
-       if (flagArray.data[valueIndex].sentence_2_flag === true) {
-           flagArray.data[valueIndex].sentence_2_flag = false;
-		   console.log('true 語句二'); 
-           return true;
-       }
+            if (flagArray.data[valueIndex].sentence_2_flag === true) {
+                flagArray.data[valueIndex].sentence_2_flag = false;
+		console.log('true 語句二'); 
+                return true;
+            }
 
+            break;
 
-        break;
-
-    case '語句三':
+            case '語句三':
          
-       if (flagArray.data[valueIndex].sentence_3_flag === true) {
-           flagArray.data[valueIndex].sentence_3_flag = false;
-		   console.log('true 語句三'); 
-           return true;
-       }
+            if (flagArray.data[valueIndex].sentence_3_flag === true) {
+                flagArray.data[valueIndex].sentence_3_flag = false;
+	        console.log('true 語句三'); 
+                return true;
+            }
 
+            break;
 
-        break;
-
-    case '語句四':
+            case '語句四':
         
-       if (flagArray.data[valueIndex].sentence_4_flag === true) {
-           flagArray.data[valueIndex].sentence_4_flag = false;
-		   console.log('true 語句四'); 
-           return true;
-       }
+            if (flagArray.data[valueIndex].sentence_4_flag === true) {
+                flagArray.data[valueIndex].sentence_4_flag = false;
+		console.log('true 語句四'); 
+                return true;
+            }
 
-        break;
+            break;
 
-    case '語句五':
+            case '語句五':
                
-       if (flagArray.data[valueIndex].sentence_5_flag === true) {
-           flagArray.data[valueIndex].sentence_5_flag = false;
-		   console.log('true 語句五');    
-           return true;
-       }
+            if (flagArray.data[valueIndex].sentence_5_flag === true) {
+                flagArray.data[valueIndex].sentence_5_flag = false;
+		console.log('true 語句五');    
+                return true;
+            }
 
-       break;
+            break;
        
-   }
-     return false;
+        }
+        return false;
     };
-
 	
     ext.when_listen_number_and_run = function(ip) {
        
-    var valueIndex_2 = -1;
+       var valueIndex_2 = -1;
 
-    for(var j = 0; j < flagArray.data.length; j++){
+       for(var j = 0; j < flagArray.data.length; j++){
 
              if ( ip == flagArray.data[j].device) {          
                   valueIndex_2 = j;
              }
-    }
+       }
 
-    if ( valueIndex_2 === -1 ) {
+       if ( valueIndex_2 === -1 ) {
 	
-        console.log('valueIndex_2 === -1');  	
-		return false;
-	}
+             console.log('valueIndex_2 === -1');  	
+	     return false;
+       }
          
-    if (flagArray.data[valueIndex_2].number_flag === true) {
-		   console.log('true number'); 
-           flagArray.data[valueIndex_2].number_flag = false;             
-           return true;
-    }
+       if (flagArray.data[valueIndex_2].number_flag === true) {
+	     console.log('true number'); 
+             flagArray.data[valueIndex_2].number_flag = false;             
+             return true;
+       }
 
-     return false;
+       return false;
     };
 
 	
     ext.getCorrectedSentence = function(ip) {
        
-    var valueIndex_3 = -1;
+        var valueIndex_3 = -1;
 
-    for(var k = 0; k < flagArray.data.length; k++){
+        for(var k = 0; k < flagArray.data.length; k++){
 
              if ( ip == flagArray.data[k].device) {               
                   valueIndex_3 = k;
              }
-    }
+        }
 	
-    if ( valueIndex_3 === -1 ) {
+        if ( valueIndex_3 === -1 ) {
 	
-        console.log('valueIndex_3 === -1');  	
-		return 'no device';
+              console.log('valueIndex_3 === -1');  	
+	     return 'no device';
 	}
 
-    console.log('getCorrectedSentence: ' + flagArray.data[valueIndex_3].correctedSentence);   
-  		
-     return flagArray.data[valueIndex_3].correctedSentence;
+        console.log('getCorrectedSentence: ' + flagArray.data[valueIndex_3].correctedSentence);   		
+        return flagArray.data[valueIndex_3].correctedSentence;
     };
 
 
@@ -781,20 +898,20 @@
 
 ext.Add_and_update_sentence_number = function (ip) {
        
-         var setupFlag_init_3 = true;
-         var flagIndex_init_3 = 0;
+    var setupFlag_init_3 = true;
+    var flagIndex_init_3 = 0;
 
-         for(var f = 0; f < flagArray.data.length; f++) {
+    for(var f = 0; f < flagArray.data.length; f++) {
 
-              console.log("flagArray.data[f].device: "+  flagArray.data[f].device ); 
-             if ( ip == flagArray.data[f].device) {
+        console.log("flagArray.data[f].device: "+  flagArray.data[f].device ); 
+        if ( ip == flagArray.data[f].device) {
                setupFlag_init_3 = false;
                flagIndex_init_3 = f;
                console.log("false" + "flagIndex_init_3: "+ flagIndex_init_3);
-             }
-         }         
+        }
+    }         
 
-         if ( setupFlag_init_3 == true) {
+    if ( setupFlag_init_3 == true) {
               
                flagArray.data.push( { device: ip, correctedSentence: "", sentence_1_flag: false, sentence_2_flag: false, sentence_3_flag: false, 
                sentence_4_flag: false, sentence_5_flag: false, number_flag: false, touch_head_flag: false, get_sentences_flag: true, recursionFlag: true } );
@@ -802,11 +919,10 @@ ext.Add_and_update_sentence_number = function (ip) {
                flagIndex_init_3 = flagArray.data.length -1 ;
                console.log("true " + "flagIndex_init_3: "+ flagIndex_init_3);
 
-         }
+    }
    
-		
-	if  ( flagArray.data[flagIndex_init_3].recursionFlag === true) {
-              flagArray.data[flagIndex_init_3].recursionFlag = false;
+    if  ( flagArray.data[flagIndex_init_3].recursionFlag === true) {
+          flagArray.data[flagIndex_init_3].recursionFlag = false;
 
         $.ajax({
             url: 'http://' + ip + port + '/?extension=advance' + '&name=Add_and_update_sentence' + '&p1=' + 'test' + '&p2=' + 'zenbo',
@@ -824,19 +940,38 @@ ext.Add_and_update_sentence_number = function (ip) {
             }
         }); 
 
-        } 
+    } 
 
-    };    
+   };    
+
+   ext.when_touch_head_and_run = function(ip) {
+       
+       var valueIndex_touch_head =  getValueIndex(ip);
+
+       if ( valueIndex_touch_head === -1 ) {
+	
+              console.log('return false, valueIndex_touch_head === -1');  	
+	      return false;
+       }
+         
+       if (flagArray.data[valueIndex_touch_head].touch_head_flag === true) {
+		   console.log('return true, touch head'); 
+                   flagArray.data[valueIndex_touch_head].touch_head_flag = false;             
+               return true;
+       }
+
+       return false;
+   };
 
     var descriptor = {
         blocks: [
-            ['r', '設定Zenbo IP: %s', 'Setting_targetIP', "192.168.0.1"],
+            ['w', '設定Zenbo IP: %s', 'Setting_targetIP', "192.168.0.1"],
             ['', 'IP %s 移動 %m.move_direction %m.move_far 公尺 %m.move_speed 速度', 'Body_movement', "192.168.0.1", "前進", "0.25", "一般"],
-            ['', 'IP %s 停止', 'Stop_moving', "192.168.0.1"],
+            ['', 'IP %s 停止動作', 'Stop_moving', "192.168.0.1"],
             ['', 'IP %s 轉動頭部 向 %m.head_direction %m.head_degree 度', 'Head_movement', "192.168.0.1", "左", "45"], 
             ['', 'IP %s 轉動身體 向 %m.body_turn_direction %m.body_turn_degree 度', 'Body_turn', "192.168.0.1", "左轉", "90"],
             ['', 'IP %s 控制身體 %m.remote_control_body', 'Remote_control_body', "192.168.0.1", "右轉"],
-            ['', 'IP %s Zenbo 做動作 %m.action_type', 'Action', "192.168.0.1", '打招呼'],
+       //   ['', 'IP %s Zenbo 做動作 %m.action_type', 'Action', "192.168.0.1", '打招呼'],
             ['', 'IP %s 做出表情 %m.facial_type', 'Facial', "192.168.0.1", '期待'],
             ['', 'IP %s 隱藏表情', 'hideFace', "192.168.0.1"],
             ['', 'IP %s 說話 %m.tts_type ', 'TTS', "192.168.0.1", 'Hi,你好'],
@@ -857,6 +992,7 @@ ext.Add_and_update_sentence_number = function (ip) {
             ['', 'IP %s %m.openDriveAudioUrlItems 播放 Google Drive 音樂: %s', 'openDriveAudioUrl', "192.168.0.1", '開始', 'https://drive.google.com/open?id=0B5o6VwYT7NaibHJ0LWtHN0JtVFU'], 
             ['', 'IP %s %m.openDrivePictureUrlItems 瀏覽 Google Drive 圖片: %s', 'openDrivePictureUrl', "192.168.0.1", '開始', 'https://drive.google.com/open?id=0B5o6VwYT7NaiSVJ0S3JKeEZwODA'],
             ['', 'IP %s %m.openDriveDocumentUrlItems 瀏覽 Google Drive 文件: %s', 'openDriveDocumentUrl', "192.168.0.1", '開始', 'https://drive.google.com/open?id=0B5o6VwYT7NaiN1h3SXZHTjRsc2s'],
+            ['h', '當摸到 IP %s 的頭', 'when_touch_head_and_run', "192.168.0.1"],  
         ],
         menus: {
             "head_direction": ["左", "右", "上", "下"],

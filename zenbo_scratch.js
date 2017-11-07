@@ -386,6 +386,7 @@
             dataType: 'text',
             crossDomain: true,
             success: function (data) {
+		console.log('data' + data);
                 console.log("success handler");
 
             },
@@ -404,6 +405,7 @@
             dataType: 'text',
             crossDomain: true,
             success: function (data) {
+		console.log('data' + data);
                 console.log("success handler");
 
             },

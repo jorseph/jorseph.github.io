@@ -116,6 +116,7 @@
 		       dataType: 'text',
 		       crossDomain: true,
 		       success: function (data) {
+		       console.log("Data"+ data);
 		       console.log("Add_and_update_sentence test zenbo success handler");
 		       getSentencesRecursion(ip, flagIndex_init);
 
